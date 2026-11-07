@@ -16,7 +16,9 @@ public class OrderBillingEngine {
 
     // Bad Practice 1: Hardcoded file paths and direct file manipulation
     private String logFilePath = "order_audit.log";
-
+        private final DiscountCalculator discountCalculator = new DiscountCalculator();
+    private final TaxCalculator taxCalculator = new TaxCalculator();
+      
     public boolean processOrder(Map<String, Object> orderData) {
         // 1. Input Validation (Messy nested validation and console error printing)
         if (orderData == null || orderData.isEmpty()) {
@@ -53,46 +55,13 @@ public class OrderBillingEngine {
             rawTotal += price * quantity;
         }
 
-        double discount = 0.0;
-        String customerType = (String) orderData.getOrDefault("customerType", "REGULAR");
-
-        // Hardcoded discount rules with magic percentages
-        if (customerType.equals("VIP")) {
-            if (rawTotal > 5000) {
-                discount = rawTotal * 0.15; // 15% discount for VIP over 5000
-            } else {
-                discount = rawTotal * 0.10; // 10% discount for VIP under 5000
-            }
-        } else if (customerType.equals("STUDENT")) {
-            discount = rawTotal * 0.08; // 8% student discount
-        } else if (customerType.equals("CORPORATE")) {
-            if (items.size() >= 10) {
-                discount = rawTotal * 0.20; // 20% bulk corporate discount
-            } else {
-                discount = rawTotal * 0.05; // 5% standard corporate discount
-            }
-        } else {
-            if (rawTotal > 10000) {
-                discount = 500.0; // Flat discount for large regular orders
-            }
-        }
-
+                String customerType = (String) orderData.getOrDefault("customerType", "REGULAR");
+        double discount = discountCalculator.calculate(customerType, rawTotal, items.size());
         double netAmount = rawTotal - discount;
 
-        // Hardcoded Tax Rules by Country
         String country = (String) orderData.getOrDefault("country", "PK");
-        double taxRate = 0.15;
-        if (country.equals("PK")) {
-            taxRate = 0.17;
-        } else if (country.equals("US")) {
-            taxRate = 0.08;
-        } else if (country.equals("UK")) {
-            taxRate = 0.20;
-        }
-
-        double tax = netAmount * taxRate;
+        double tax = taxCalculator.calculateTax(netAmount, country);
         double payableAmount = netAmount + tax;
-
         // 3. Payment Processing (Violates Open/Closed Principle)
         String paymentMethod = (String) orderData.getOrDefault("paymentMethod", "CASH");
         String paymentStatus = "FAILED";
