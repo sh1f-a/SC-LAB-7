@@ -18,6 +18,7 @@ public class OrderBillingEngine {
     private String logFilePath = "order_audit.log";
         private final DiscountCalculator discountCalculator = new DiscountCalculator();
     private final TaxCalculator taxCalculator = new TaxCalculator();
+        private final PaymentStrategyRegistry paymentRegistry = new PaymentStrategyRegistry();
       
     public boolean processOrder(Map<String, Object> orderData) {
         // 1. Input Validation (Messy nested validation and console error printing)
@@ -63,38 +64,16 @@ public class OrderBillingEngine {
         double tax = taxCalculator.calculateTax(netAmount, country);
         double payableAmount = netAmount + tax;
         // 3. Payment Processing (Violates Open/Closed Principle)
-        String paymentMethod = (String) orderData.getOrDefault("paymentMethod", "CASH");
-        String paymentStatus = "FAILED";
-
-        if (paymentMethod.equals("CREDIT_CARD")) {
-            String cardNumber = (String) orderData.getOrDefault("cardNumber", "");
-            if (cardNumber.length() == 16 && cardNumber.matches("\\d+")) {
-                System.out.println("Processing credit card payment of PKR " + payableAmount);
-                paymentStatus = "PAID";
-            } else {
-                System.out.println("Card declined: Must be 16 digits.");
-                return false;
-            }
-        } else if (paymentMethod.equals("EASYPAISA")) {
-            String mobileNo = (String) orderData.getOrDefault("mobileNumber", "");
-            if (mobileNo.length() == 11 && mobileNo.startsWith("03")) {
-                System.out.println("Sending EasyPaisa OTP push to " + mobileNo + " for PKR " + payableAmount);
-                paymentStatus = "PAID";
-            } else {
-                System.out.println("EasyPaisa failed: Invalid mobile number.");
-                return false;
-            }
-        } else if (paymentMethod.equals("CASH_ON_DELIVERY")) {
-            if (payableAmount > 25000) {
-                System.out.println("Cash on delivery not allowed for orders above PKR 25,000.");
-                return false;
-            }
-            paymentStatus = "PENDING_CASH";
-        } else {
+                String paymentMethod = (String) orderData.getOrDefault("paymentMethod", "CASH");
+        PaymentStrategy strategy = paymentRegistry.find(paymentMethod);
+        if (strategy == null) {
             System.out.println("Error: Unsupported payment method: " + paymentMethod);
             return false;
         }
-
+        String paymentStatus = strategy.pay(orderData, payableAmount);
+        if (paymentStatus == null) {
+            return false;
+        }
         // 4. Direct File Saving (Side-effect inside business logic)
         try (FileWriter writer = new FileWriter(logFilePath, true)) {
             writer.write(LocalDateTime.now() + " | Order for: " + email + " | Payable: PKR " 
