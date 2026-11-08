@@ -19,6 +19,7 @@ public class OrderBillingEngine {
         private final DiscountCalculator discountCalculator = new DiscountCalculator();
     private final TaxCalculator taxCalculator = new TaxCalculator();
         private final PaymentStrategyRegistry paymentRegistry = new PaymentStrategyRegistry();
+            private final NotificationRegistry notificationRegistry = new NotificationRegistry();
       
     public boolean processOrder(Map<String, Object> orderData) {
         // 1. Input Validation (Messy nested validation and console error printing)
@@ -83,20 +84,15 @@ public class OrderBillingEngine {
         }
 
         // 5. Direct Notification Dispatch (Coupled side-effect)
-        String notifyChannel = (String) orderData.getOrDefault("notifyChannel", "EMAIL");
-        if (notifyChannel.equals("EMAIL")) {
-            System.out.println("[EMAIL DISPATCHED] To: " + email + " | Your order of PKR " 
-                               + String.format("%.2f", payableAmount) + " is confirmed!");
-        } else if (notifyChannel.equals("SMS")) {
-            String phone = (String) orderData.getOrDefault("phone", "0300-0000000");
-            System.out.println("[SMS DISPATCHED] To: " + phone + " | Order confirmed! Paid: PKR " 
-                               + String.format("%.2f", payableAmount));
+                String notifyChannel = (String) orderData.getOrDefault("notifyChannel", "EMAIL");
+        NotificationService notifier = notificationRegistry.find(notifyChannel);
+        if (notifier != null) {
+            notifier.send(orderData, email, payableAmount);
         }
-
+        
         return true;
     }
-
-    // Helper getter/setter for testing file path redirection
+        // Helper getter/setter for testing file path redirection
     public void setLogFilePath(String logFilePath) {
         this.logFilePath = logFilePath;
     }
