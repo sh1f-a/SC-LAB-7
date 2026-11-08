@@ -1,7 +1,5 @@
 package com.uet.billing;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.time.LocalDateTime;
+
 import java.util.List;
 import java.util.Map;
 
@@ -16,6 +14,7 @@ public class OrderBillingEngine {
 
     // Bad Practice 1: Hardcoded file paths and direct file manipulation
     private String logFilePath = "order_audit.log";
+        private OrderRepository orderRepository = new FileOrderRepository(logFilePath);
         private final DiscountCalculator discountCalculator = new DiscountCalculator();
     private final TaxCalculator taxCalculator = new TaxCalculator();
         private final PaymentStrategyRegistry paymentRegistry = new PaymentStrategyRegistry();
@@ -76,12 +75,7 @@ public class OrderBillingEngine {
             return false;
         }
         // 4. Direct File Saving (Side-effect inside business logic)
-        try (FileWriter writer = new FileWriter(logFilePath, true)) {
-            writer.write(LocalDateTime.now() + " | Order for: " + email + " | Payable: PKR " 
-                         + payableAmount + " | Status: " + paymentStatus + "\n");
-        } catch (IOException e) {
-            System.out.println("Failed to write order log: " + e.getMessage());
-        }
+               orderRepository.save(email, payableAmount, paymentStatus);
 
         // 5. Direct Notification Dispatch (Coupled side-effect)
                 String notifyChannel = (String) orderData.getOrDefault("notifyChannel", "EMAIL");
@@ -93,8 +87,9 @@ public class OrderBillingEngine {
         return true;
     }
         // Helper getter/setter for testing file path redirection
-    public void setLogFilePath(String logFilePath) {
+        public void setLogFilePath(String logFilePath) {
         this.logFilePath = logFilePath;
+        this.orderRepository = new FileOrderRepository(logFilePath);
     }
 
     public String getLogFilePath() {
